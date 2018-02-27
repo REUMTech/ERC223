@@ -6,6 +6,7 @@ import "./../interface/ERC223.sol";
 import "./../interface/ERC223Receiver.sol";
 
 contract Standard223Token is StandardToken, ERC223 {
+    using SafeMath for uint256;
 
     /**
      * @dev Transfer the specified amount of tokens to the specified address.
@@ -19,11 +20,14 @@ contract Standard223Token is StandardToken, ERC223 {
      * @param _data  Transaction metadata.
     */
     function transfer(address _to, uint256 _value, bytes _data) public returns (bool success) {
-        if (!super.transfer(_to, _value)) revert();
-        if (isContract(_to)) {
-            contractFallback(_to, _value, _data);
+        require(_to != address(0));
+        require(_value <= balances[msg.sender]);
+
+        if(isContract(_to)) {
+            return transferToContract(_to, _value, _data);
+        } else {
+            return transferToAddress(_to, _value);
         }
-        return true;
     }
 
     /**
@@ -37,16 +41,20 @@ contract Standard223Token is StandardToken, ERC223 {
         return transfer(_to, _value, new bytes(0));
     }
 
-    /**
-    * @dev Calls ERC223Receiver.tokenFallback function
-    *
-    * @param _to    Address of the reciever contract.
-    * @param _value Amount of tokens that will be transferred.
-    * @param _data  Transaction metadata.
-    */
-    function contractFallback(address _to, uint256 _value, bytes _data) private {
+    function transferToAddress(address _to, uint _value) private returns (bool success) {
+        balances[msg.sender] = balances[msg.sender].sub(_value);
+        balances[_to] = balances[_to].add(_value);
+        Transfer(msg.sender, _to, _value);
+        return true;
+    }
+
+    function transferToContract(address _to, uint _value, bytes _data) private returns (bool success) {
+        balances[msg.sender] = balances[msg.sender].sub(_value);
+        balances[_to] = balances[_to].add(_value);
         ERC223Receiver reciever = ERC223Receiver(_to);
         reciever.tokenFallback(msg.sender, _value, _data);
+        Transfer(msg.sender, _to, _value);
+        return true;
     }
 
     /**
