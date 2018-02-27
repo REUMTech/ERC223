@@ -13,7 +13,6 @@ contract Standard223Token is StandardToken, ERC223 {
      *      Invokes the `tokenFallback` function if the recipient is a contract.
      *      The token transfer fails if the recipient is a contract
      *      but does not implement the `tokenFallback` function
-     *      or the fallback function to receive funds.
      *
      * @param _to    Receiver address.
      * @param _value Amount of tokens that will be transferred.
@@ -25,6 +24,32 @@ contract Standard223Token is StandardToken, ERC223 {
 
         if(isContract(_to)) {
             return transferToContract(_to, _value, _data);
+        } else {
+            return transferToAddress(_to, _value);
+        }
+    }
+
+    /**
+     * @dev Transfer the specified amount of tokens to the specified address.
+     *      Invokes the `_custom_fallback` function if the recipient is a contract.
+     *      The token transfer fails if the recipient is a contract
+     *      but does not implement the `_custom_fallback` function
+     *
+     * @param _to    Receiver address.
+     * @param _value Amount of tokens that will be transferred.
+     * @param _data  Transaction metadata.
+    */
+    function transfer(address _to, uint _value, bytes _data, string _custom_fallback) public returns (bool success) {
+        require(_to != address(0));
+        require(_value <= balances[msg.sender]);
+
+        if(isContract(_to)) {
+            balances[msg.sender] = balances[msg.sender].sub(_value);
+            balances[_to] = balances[_to].add(_value);
+            /* solium-disable-next-line */
+            assert(_to.call.value(0)(bytes4(keccak256(_custom_fallback)), msg.sender, _value, _data));
+            Transfer(msg.sender, _to, _value);
+            return true;
         } else {
             return transferToAddress(_to, _value);
         }
