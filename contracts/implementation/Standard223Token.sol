@@ -1,0 +1,67 @@
+pragma solidity 0.4.18;
+
+import "./../zeppelin/token/ERC20/StandardToken.sol";
+import "./../zeppelin/math/SafeMath.sol";
+import "./../interface/ERC223.sol";
+import "./../interface/ERC223Receiver.sol";
+
+contract Standard223Token is StandardToken, ERC223 {
+
+    /**
+     * @dev Transfer the specified amount of tokens to the specified address.
+     *      Invokes the `tokenFallback` function if the recipient is a contract.
+     *      The token transfer fails if the recipient is a contract
+     *      but does not implement the `tokenFallback` function
+     *      or the fallback function to receive funds.
+     *
+     * @param _to    Receiver address.
+     * @param _value Amount of tokens that will be transferred.
+     * @param _data  Transaction metadata.
+    */
+    function transfer(address _to, uint256 _value, bytes _data) public returns (bool success) {
+        if (!super.transfer(_to, _value)) revert();
+        if (isContract(_to)) {
+            contractFallback(_to, _value, _data);
+        }
+        return true;
+    }
+
+    /**
+     * @dev Transfer the specified amount of tokens to the specified address.
+     *      Added due to backwards compatibility reasons.
+     *
+     * @param _to    Receiver address.
+     * @param _value Amount of tokens that will be transferred.
+    */
+    function transfer(address _to, uint256 _value) public returns (bool success) {
+        return transfer(_to, _value, new bytes(0));
+    }
+
+    /**
+    * @dev Calls ERC223Receiver.tokenFallback function
+    *
+    * @param _to    Address of the reciever contract.
+    * @param _value Amount of tokens that will be transferred.
+    * @param _data  Transaction metadata.
+    */
+    function contractFallback(address _to, uint256 _value, bytes _data) private {
+        ERC223Receiver reciever = ERC223Receiver(_to);
+        reciever.tokenFallback(msg.sender, _value, _data);
+    }
+
+    /**
+    * @dev Retrieve the size of the code on target address, this needs assembly.
+    *
+    * @param _addr  The address to check if it's a contract.
+    *
+    * @return is_contract   TRUE if it's a contract else false.
+    */
+    function isContract(address _addr) private view returns (bool is_contract) {
+        uint256 length;
+        /* solium-disable-next-line */
+        assembly {
+            length := extcodesize(_addr)
+        }
+        return length > 0;
+    }
+}
